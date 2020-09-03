@@ -19,7 +19,11 @@ set cpo&vim
 let g:slumlord_plantuml_jar_path = get(g:, 'slumlord_plantuml_jar_path', expand("<sfile>:p:h") . "/../plantuml.jar")
 let g:slumlord_plantuml_include_path = get(g:, 'slumlord_plantuml_include_path', expand("~/.config/plantuml/include/"))
 let g:slumlord_asciiart_utf = get(g:, 'slumlord_asciiart_utf', 1)
-let s:base_cmd = "java -Dapple.awt.UIElement=true -Dplantuml.include.path=\"". g:slumlord_plantuml_include_path ."\" -splash: -jar ". g:slumlord_plantuml_jar_path ." "
+let s:base_cmd = 
+            \ "java -Dapple.awt.UIElement=true -Dplantuml.include.path=\""
+            \ . substitute(g:slumlord_plantuml_include_path, '[\/]$', '', '')
+            \ . "\" -splash: -jar " . g:slumlord_plantuml_jar_path . " "
+            " substitute above is to avoid issues in ms-windows
 
 " function {{{1
 function! slumlord#updatePreview(args) abort
@@ -57,7 +61,14 @@ endfunction
 
 " Export image {{{1
 function! slumlord#exportImage(args) abort
-    call system(s:base_cmd . " -gui " . fnameescape(fnamemodify('%', ":p:h")) . "&")
+    " using xolox#misc#os#exec() to run the cmd in background even on ms-windows
+    if !exists('*xolox#misc#os#exec')
+        echom "ExportImage: missing vim-shell plugin (available at github.com/xolox/vim-shell)"
+        return
+    endif
+    call xolox#misc#os#exec({
+                \ 'command': s:base_cmd . " -gui " . fnameescape(fnamemodify('%', ":p:h")),
+                \ 'async': 1 })
 endfunction
 
 function! s:shouldInsertPreview() abort
