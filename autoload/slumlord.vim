@@ -54,7 +54,7 @@ function! slumlord#updatePreview(args) abort
     else
         call system(cmd)
         if v:shell_error == 0
-            call s:updater.update(a:args)
+            silent call s:updater.update(a:args)
         endif
     endif
 endfunction
@@ -109,7 +109,7 @@ function! s:asyncHandlerAdapter(job_id, data, event) abort dict
         return 0
     endif
 
-    call s:updater.update(self)
+    silent call s:updater.update(self)
 endfunction
 
 function! s:readWithoutStoringAsAltFile(fname) abort
