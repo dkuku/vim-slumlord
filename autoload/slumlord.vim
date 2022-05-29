@@ -19,11 +19,16 @@ set cpo&vim
 let g:slumlord_plantuml_jar_path = get(g:, 'slumlord_plantuml_jar_path', expand("<sfile>:p:h") . "/../plantuml.jar")
 let g:slumlord_plantuml_include_path = get(g:, 'slumlord_plantuml_include_path', expand("~/.config/plantuml/include/"))
 let g:slumlord_asciiart_utf = get(g:, 'slumlord_asciiart_utf', 1)
+let g:slumlord_enabled = get(g:, 'slumlord_enabled', 1)
 let s:base_cmd = 
             \ "java -Dapple.awt.UIElement=true -Dplantuml.include.path=\""
             \ . substitute(g:slumlord_plantuml_include_path, '[\/]$', '', '')
             \ . "\" -splash: -jar " . g:slumlord_plantuml_jar_path . " "
             " substitute above is to avoid issues in ms-windows
+
+
+" command {{{1
+command! SlumlordToggle call slumlord#toggle()
 
 " function {{{1
 function! slumlord#updatePreview(args) abort
@@ -59,19 +64,17 @@ function! slumlord#updatePreview(args) abort
     endif
 endfunction
 
-" Export image {{{1
+" Export {{{1
 function! slumlord#exportImage(args) abort
-    " using xolox#misc#os#exec() to run the cmd in background even on ms-windows
-    if !exists('*xolox#misc#os#exec')
-        echom "ExportImage: missing vim-shell plugin (available at github.com/xolox/vim-shell)"
-        return
-    endif
-    call xolox#misc#os#exec({
-                \ 'command': s:base_cmd . " -gui " . fnameescape(fnamemodify('%', ":p:h")),
-                \ 'async': 1 })
+    let export_cmd = s:base_cmd . " -Djava.awt.headless=true " . fnameescape(expand('%:p'))
+    call jobstart(export_cmd)
 endfunction
 
 function! s:shouldInsertPreview() abort
+    "check live preview is enabled
+    if !g:slumlord_enabled
+        return
+    endif
     "check for 'no-preview flag
     if search('^\s*''no-preview', 'wn') > 0
         return
@@ -94,6 +97,11 @@ function! s:shouldInsertPreview() abort
 
     "check for activity diagrams
     if search('^\s*:.*;', 'wn') > 0
+        return
+    endif
+
+    "skip mindmaps for now
+    if search('^@startmindmap', 'wn') > 0
         return
     endif
 
@@ -127,11 +135,11 @@ endfunction
 function! s:convertNonAsciiSupportedSyntax(fname) abort
     exec 'sp' a:fname
 
-    /@startuml/,/@enduml/s/^\s*\(boundary\|database\|entity\|control\)/participant/e
-    /@startuml/,/@enduml/s/^\s*\(end \)\?\zsref\>/note/e
-    /@startuml/,/@enduml/s/^\s*ref\>/note/e
-    /@startuml/,/@enduml/s/|||/||4||/e
-    /@startuml/,/@enduml/s/\.\.\.\([^.]*\)\.\.\./==\1==/e
+    /^@start/,/^@end/s/^\s*\(boundary\|database\|entity\|control\)/participant/e
+    /^@start/,/^@end/s/^\s*\(end \)\?\zsref\>/note/e
+    /^@start/,/^@end/s/^\s*ref\>/note/e
+    /^@start/,/^@end/s/|||/||4||/e
+    /^@start/,/^@end/s/\.\.\.\([^.]*\)\.\.\./==\1==/e
     write
 
     bwipe!
@@ -169,7 +177,7 @@ endfunction
 
 " InPlaceUpdater object {{{1
 let s:InPlaceUpdater = {}
-let s:InPlaceUpdater.divider = "@startuml"
+let s:InPlaceUpdater.divider = "@start"
 
 function! s:InPlaceUpdater.update(args) abort
     let startLine = line(".")
@@ -276,6 +284,16 @@ function s:WinUpdater.__setupWinOpts() abort
     hi def link plantumlPreviewDividerText Constant
     hi def link plantumlPreviewMethodCall plantumlText
     hi def link plantumlPreviewMethodCallParen plantumlColonLine
+endfunction
+
+function! slumlord#toggle()
+    if g:slumlord_enabled
+        let g:slumlord_enabled = 0
+        echo 'Slumlord Disabled.'
+    else
+        let g:slumlord_enabled = 1
+        echo 'Slumlord Enabled.'
+    endif
 endfunction
 
 
